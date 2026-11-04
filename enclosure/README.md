@@ -30,6 +30,14 @@ Chaque variante est enregistrée dans Fusion (projet « 1 », dossier `MiniKB`) 
 
 Les variantes batterie sont dans `variants/<n>_touches_batterie/`.
 
+**4 touches sans batterie : vis M3 × 14 sans insert.** Ce document seul (`MiniKB 4 touches (2x2)` et `variants/4_touches/`) est réglé pour des vis M3 de 14 mm vissées directement dans le plastique :
+- trous de 3,4 mm dans la plaque ;
+- avant-trous de 2,6 mm dans les piliers, qui passent à Ø 6,4 mm ;
+- 12,5 mm de filet en prise, la pointe s'arrêtant 0,4 mm au-dessus du fond du trou ;
+- paramètres `screw_d` = 3, `insert_d` = 2,6, `insert_depth` = 12,9, `pillar_d` = 6,4 et `pillar_inset` = 4,8.
+
+Visse doucement la première fois, sans forcer en fin de course. Les autres variantes et le script restent en M2 + inserts.
+
 Pour chaque variante : timeline sans erreur, toutes les pièces fermées (manifold), et aucune interférence (vérifiée sur la 2 touches sans batterie, la plus compacte, et sur les quatre variantes batterie). Le firmware reste le même : la config par défaut a 8 touches, supprime celles en trop dans le web UI. Jusqu'à 4 touches, toutes peuvent réveiller le clavier de la veille (GPIO 0 à 5).
 
 ## Ce qu'il faut acheter
