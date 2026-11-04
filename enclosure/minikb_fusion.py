@@ -29,7 +29,6 @@ PARAMS = [
     ("pillar_inset", "4.6 mm", "mm", "Axe des piliers depuis la paroi intérieure"),
     ("side_gap", "1 mm", "mm", "Jeu latéral entre grille et paroi"),
     ("front_margin", "6 mm", "mm", "Zone avant (piliers)"),
-    ("board_zone", "28 mm", "mm", "Zone arrière pour la SuperMini"),
     ("floor_t", "2 mm", "mm", "Épaisseur du fond"),
     ("corner_r", "3 mm", "mm", "Rayon des coins extérieurs"),
     ("ef_chamfer", "0.4 mm", "mm", "Chanfrein anti elephant foot"),
@@ -58,13 +57,17 @@ PARAMS = [
     ("boot_x", "-5.5 mm", "mm", "Bouton BOOT / centre carte, à vérifier"),
     ("boot_y", "7.5 mm", "mm", "Bouton BOOT, +Y vers l'USB, à vérifier"),
     ("boot_hole", "2 mm", "mm", "Trou d'accès BOOT (trombone)"),
-    ("battery", "0", "", "1 = zone LiPo + TP4056 (relancer le script après changement)"),
-    ("bat_l", "50 mm", "mm", "Longueur LiPo (103450 ~ 1000 mAh)"),
-    ("tp_w", "17.5 mm", "mm", "Largeur module TP4056"),
-    ("bat_zone", "bat_l + tp_w + 6 mm", "mm", "Longueur ajoutée si battery = 1"),
-    ("tp_usb_z", "4 mm", "mm", "Hauteur axe USB TP4056 au-dessus du fond"),
-    ("tp_usb_cut_w", "11 mm", "mm", "Découpe USB TP4056 largeur"),
-    ("tp_usb_cut_h", "5 mm", "mm", "Découpe USB TP4056 hauteur"),
+    ("battery", "0", "", "1 = petite LiPo + TP4056 USB-C (relancer le script après changement)"),
+    ("tp_l", "28 mm", "mm", "Longueur TP4056 USB-C avec protection, à vérifier"),
+    ("tp_w", "17.5 mm", "mm", "Largeur TP4056, à vérifier"),
+    ("tp_pcb_t", "1 mm", "mm", "Épaisseur PCB TP4056, à vérifier"),
+    ("tp_led_x", "0 mm", "mm", "LED de charge / centre TP4056, à vérifier"),
+    ("tp_led_y", "-6 mm", "mm", "LED de charge, +Y vers l'USB, à vérifier"),
+    ("bat_l", "30 mm", "mm", "Longueur LiPo, sens avant-arrière (502030 ~ 250 mAh)"),
+    ("bat_w", "20 mm", "mm", "Largeur LiPo"),
+    ("bat_t", "5 mm", "mm", "Épaisseur LiPo"),
+    ("bat_zone", "bat_l + 4 mm", "mm", "Longueur ajoutée pour la LiPo si battery = 1"),
+    ("board_zone", "28 mm + battery * (tp_l - board_l)", "mm", "Zone arrière des cartes"),
     ("sw_hole_w", "9 mm", "mm", "Trou interrupteur à glissière (SS12D00)"),
     ("sw_hole_h", "4.5 mm", "mm", "Trou interrupteur hauteur"),
     ("sw_hole_z", "4 mm", "mm", "Axe interrupteur au-dessus du fond"),
@@ -90,6 +93,8 @@ PARAMS = [
     ("legend_depth", "0.4 mm", "mm", "Gravure de la légende"),
     ("inner_w", "cols * key_pitch + 2 * side_gap", "mm", "Largeur intérieure (calculée)"),
     ("inner_l", "front_margin + rows * key_pitch + battery * bat_zone + board_zone", "mm", "Longueur intérieure (calculée)"),
+    ("board_cx", "inner_w / 2 - battery * (tp_w + 2 * tolerance + cradle_wall) / 2", "mm", "Centre X de la SuperMini (décalée si TP4056)"),
+    ("tp_cx", "board_cx + (board_w + tp_w) / 2 + 2 * tolerance + cradle_wall", "mm", "Centre X du TP4056"),
     ("z_wall", "case_height - plate_thickness", "mm", "Haut des parois = dessous de plaque"),
     ("cap_seat", "sw_stem_top - stem_insert", "mm", "Bas de keycap au repos au-dessus de la plaque"),
 ]
@@ -123,11 +128,23 @@ def coll(items):
     return c
 
 
+# Anciennes valeurs par défaut remplacées : mises à jour seulement si tu ne les avais pas changées.
+OLD_DEFAULTS = {"board_zone": "28 mm", "bat_l": "50 mm", "bat_zone": "bat_l + tp_w + 6 mm"}
+OBSOLETE = ("tp_usb_z", "tp_usb_cut_w", "tp_usb_cut_h")
+
+
 def set_params():
     ups = design.userParameters
     for name, expr, unit, comment in PARAMS:
         if not ups.itemByName(name):
             ups.add(name, vi(expr), unit, comment)
+    for name, old in OLD_DEFAULTS.items():
+        p = ups.itemByName(name)
+        if p and p.expression.replace(" ", "") == old.replace(" ", ""):
+            new = next(e for n, e, _, _ in PARAMS if n == name)
+            p.expression = new
+            p.comment = next(c for n, _, _, c in PARAMS if n == name)
+    design.computeAll()  # sinon les paramètres dérivés (inner_l...) gardent leur ancienne valeur
 
 
 class Sk:
@@ -157,11 +174,25 @@ class Sk:
         if x is None:
             self.cons.addVerticalPoints(self.o, p)
         else:
-            self.dims.addDistanceDimension(self.o, p, H, tp).parameter.expression = x
+            self._dim(p, H, x, sx * ev(x), tp)
         if y is None:
             self.cons.addHorizontalPoints(self.o, p)
         else:
-            self.dims.addDistanceDimension(self.o, p, V, tp).parameter.expression = y
+            self._dim(p, V, y, sy * ev(y), tp)
+
+    def _dim(self, p, orient, expr, target, tp):
+        # Une cote n'a pas de signe : le solveur de Fusion place parfois le point du mauvais côté de
+        # l'origine. On vérifie, on ramène le point et on repose la cote.
+        for _ in range(2):
+            d = self.dims.addDistanceDimension(self.o, p, orient, tp)
+            d.parameter.expression = expr
+            cur = p.geometry.x if orient == H else p.geometry.y
+            if abs(cur - target) < 1e-5:
+                return
+            d.deleteMe()
+            delta = target - cur
+            p.move(adsk.core.Vector3D.create(delta, 0, 0) if orient == H else adsk.core.Vector3D.create(0, delta, 0))
+        raise RuntimeError(f"{self.s.name}: cote {expr} placée du mauvais côté")
 
     def rect(self, x, y, w, h, sx=1, sy=1):
         e = self._eps()
@@ -297,9 +328,12 @@ def grid_pattern(comp, entities, name):
 
 
 # Positions partagées (expressions, origine = coin intérieur avant gauche)
+# Avec la batterie, les piliers arrière avancent devant les berceaux (qui occupent toute la largeur).
+BACK_Y = "inner_l - pillar_inset - battery * (tp_l + 2 mm)"
 PILLARS = [("pillar_inset", "pillar_inset"), ("inner_w - pillar_inset", "pillar_inset"),
-           ("pillar_inset", "inner_l - pillar_inset"), ("inner_w - pillar_inset", "inner_l - pillar_inset")]
+           ("pillar_inset", BACK_Y), ("inner_w - pillar_inset", BACK_Y)]
 BOARD_CY = "inner_l - board_gap - board_l / 2"
+TP_CY = "inner_l - board_gap - tp_l / 2"
 
 
 def outer_rect(sk):
@@ -309,6 +343,30 @@ def outer_rect(sk):
 def outer_xy():
     w, il, iw = ev("wall"), ev("inner_l"), ev("inner_w")
     return [-w, iw + w], [-w, il + w]
+
+
+BAT_Y0 = "front_margin + rows * key_pitch + 2 mm"  # début de la zone LiPo
+
+
+def cradle(comp, plane, body, cx, w, l, height, prefix):
+    """Butées en U ouvertes vers la paroi arrière + appuis sous les bords de la carte."""
+    sk = Sk(comp, plane, prefix + "cradle")
+    y = f"inner_l - board_gap - {l}"
+    sk.rect(f"{cx} - {w} / 2 - tolerance - cradle_wall", f"{y} - tolerance - cradle_wall",
+            f"{w} + 2 * tolerance + 2 * cradle_wall", f"{l} + tolerance + cradle_wall + board_gap + wall / 2")
+    sk.rect(f"{cx} - {w} / 2 - tolerance", f"{y} - tolerance", f"{w} + 2 * tolerance", f"{l} + tolerance + board_gap + wall / 4")
+    sk.rect(f"{cx} - {w} / 2 + ledge_w", f"{y} + ledge_w", f"{w} - 2 * ledge_w", f"{l} - 2 * ledge_w")
+    cy = ev(f"inner_l - board_gap - {l} / 2")
+    extrude(comp, [sk.profile_at(ev(f"{cx} - {w} / 2 - tolerance - cradle_wall / 2"), cy)], height, JOIN, prefix + "stops", body)
+    extrude(comp, [sk.profile_at(ev(f"{cx} - {w} / 2 + ledge_w / 2"), cy)], "board_lift", JOIN, prefix + "ledge", body)
+
+
+def usb_cutout(comp, body, cx, pcb, prefix):
+    """Découpe USB-C dans la paroi arrière, centrée sur la prise d'une carte posée sur ses appuis."""
+    p = offset_plane(comp, f"floor_t + board_lift + {pcb} + usb_h / 2 - usb_cut_h / 2", prefix + "PL")
+    sk = Sk(comp, p, prefix + "cut")
+    sk.rect(f"{cx} - usb_cut_w / 2", "inner_l - 1 mm", "usb_cut_w", "wall + 2 mm")
+    extrude(comp, sk.all_profiles(), "usb_cut_h", CUT, prefix + "cutout", body)
 
 
 def build_case(comp):
@@ -337,35 +395,21 @@ def build_case(comp):
         sk.circle(x, y, "insert_d")
     extrude(comp, sk.all_profiles(), "-insert_depth", CUT, "Insert_holes", body)
 
-    # Berceau de la SuperMini : butées en U ouvertes vers l'USB + appuis sous la carte
-    sk = Sk(comp, p_floor, "CASE_cradle")
-    sk.rect("inner_w / 2 - board_w / 2 - tolerance - cradle_wall", "inner_l - board_gap - board_l - tolerance - cradle_wall",
-            "board_w + 2 * tolerance + 2 * cradle_wall", "board_l + tolerance + cradle_wall + board_gap + wall / 2")
-    sk.rect("inner_w / 2 - board_w / 2 - tolerance", "inner_l - board_gap - board_l - tolerance",
-            "board_w + 2 * tolerance", "board_l + tolerance + board_gap + wall / 4")
-    sk.rect("inner_w / 2 - board_w / 2 + ledge_w", "inner_l - board_gap - board_l + ledge_w",
-            "board_w - 2 * ledge_w", "board_l - 2 * ledge_w")
-    cy = ev(BOARD_CY)
-    x_rail = ev("inner_w / 2 - board_w / 2 - tolerance - cradle_wall / 2")
-    x_ledge = ev("inner_w / 2 - board_w / 2 + ledge_w / 2")
-    extrude(comp, [sk.profile_at(x_rail, cy)], "cradle_h", JOIN, "Board_stops", body)
-    extrude(comp, [sk.profile_at(x_ledge, cy)], "board_lift", JOIN, "Board_ledge", body)
-
-    # Découpe USB-C dans la paroi arrière, centrée sur la prise
-    p_usb = offset_plane(comp, "floor_t + board_lift + pcb_t + usb_h / 2 - usb_cut_h / 2", "PL_usb")
-    sk = Sk(comp, p_usb, "CASE_usb")
-    sk.rect("inner_w / 2 + usb_x - usb_cut_w / 2", "inner_l - 1 mm", "usb_cut_w", "wall + 2 mm")
-    extrude(comp, sk.all_profiles(), "usb_cut_h", CUT, "USB_cutout", body)
+    # Berceaux contre la paroi arrière : SuperMini, et TP4056 à sa droite si battery = 1
+    cradle(comp, p_floor, body, "board_cx", "board_w", "board_l", "cradle_h", "Board_")
+    usb_cutout(comp, body, "board_cx + usb_x", "pcb_t", "USB_")
 
     # Option batterie (features BAT_*, suspendues si battery = 0)
-    bat_y0 = "front_margin + rows * key_pitch + 2 mm"
-    p = offset_plane(comp, "floor_t + tp_usb_z - tp_usb_cut_h / 2", "BAT_PL_tp")
-    sk = Sk(comp, p, "BAT_tp_usb")
-    sk.rect("inner_w - 1 mm", f"{bat_y0} + bat_l + 2 mm + tp_w / 2 - tp_usb_cut_w / 2", "wall + 2 mm", "tp_usb_cut_w")
-    extrude(comp, sk.all_profiles(), "tp_usb_cut_h", CUT, "BAT_tp_usb_cut", body)
+    cradle(comp, p_floor, body, "tp_cx", "tp_w", "tp_l", "board_lift + tp_pcb_t + 1 mm", "BAT_tp_")
+    usb_cutout(comp, body, "tp_cx", "tp_pcb_t", "BAT_tp_usb_")
+    # Rails de la LiPo, posée à plat entre les touches et les cartes
+    sk = Sk(comp, p_floor, "BAT_lipo_rails")
+    for x in ("inner_w / 2 - bat_w / 2 - tolerance - cradle_wall", "inner_w / 2 + bat_w / 2 + tolerance"):
+        sk.rect(x, BAT_Y0, "cradle_wall", "bat_l")
+    extrude(comp, sk.all_profiles(), "2 mm", JOIN, "BAT_lipo_rails", body)
     p = offset_plane(comp, "floor_t + sw_hole_z - sw_hole_h / 2", "BAT_PL_switch")
     sk = Sk(comp, p, "BAT_switch")
-    sk.rect("wall + 1 mm", f"{bat_y0} + bat_l / 2 - sw_hole_w / 2", "wall + 2 mm", "sw_hole_w", sx=-1)
+    sk.rect("wall + 1 mm", f"{BAT_Y0} + bat_l / 2 - sw_hole_w / 2", "wall + 2 mm", "sw_hole_w", sx=-1)
     extrude(comp, sk.all_profiles(), "sw_hole_h", CUT, "BAT_switch_cut", body)
 
     chamfer(comp, outer_loop_edges(planar_face_at_z(body, 0, -1)), "ef_chamfer", "Elephant_foot")
@@ -405,9 +449,12 @@ def build_plate(comp):
     sk = Sk(comp, p_top, "PLATE_holes")
     for x, y in PILLARS:
         sk.circle(x, y, "screw_d + 2 * tolerance")
-    sk.circle("inner_w / 2 + led_x", f"{BOARD_CY} + led_y", "led_hole")
-    sk.circle("inner_w / 2 + boot_x", f"{BOARD_CY} + boot_y", "boot_hole")
+    sk.circle("board_cx + led_x", f"{BOARD_CY} + led_y", "led_hole")
+    sk.circle("board_cx + boot_x", f"{BOARD_CY} + boot_y", "boot_hole")
     extrude(comp, sk.all_profiles(), "-plate_thickness", CUT, "Screw_LED_BOOT_holes", body)
+    sk = Sk(comp, p_top, "BAT_tp_led")
+    sk.circle("tp_cx + tp_led_x", f"{TP_CY} + tp_led_y", "led_hole")
+    extrude(comp, sk.all_profiles(), "-plate_thickness", CUT, "BAT_tp_led_hole", body)
 
     chamfer(comp, outer_loop_edges(planar_face_at_z(body, ev("case_height"), 1)), "ef_chamfer", "Elephant_foot")
     return body
@@ -416,17 +463,32 @@ def build_plate(comp):
 def build_board(comp):
     p = offset_plane(comp, "floor_t + board_lift", "PL_board")
     sk = Sk(comp, p, "BOARD_pcb")
-    sk.rect("inner_w / 2 - board_w / 2", "inner_l - board_gap - board_l", "board_w", "board_l")
+    sk.rect("board_cx - board_w / 2", "inner_l - board_gap - board_l", "board_w", "board_l")
     body = extrude(comp, sk.all_profiles(), "pcb_t", NEW, "PCB").bodies.item(0)
     body.name = "SuperMini"
     p = offset_plane(comp, "floor_t + board_lift + pcb_t", "PL_board_top")
     sk = Sk(comp, p, "BOARD_usb")
-    sk.rect("inner_w / 2 + usb_x - usb_w / 2", "inner_l - board_gap - usb_l", "usb_w", "usb_l")
+    sk.rect("board_cx + usb_x - usb_w / 2", "inner_l - board_gap - usb_l", "usb_w", "usb_l")
     extrude(comp, sk.all_profiles(), "usb_h", JOIN, "USB_C", body)
     sk = Sk(comp, p, "BOARD_led_boot")
-    sk.circle("inner_w / 2 + led_x", f"{BOARD_CY} + led_y", "1.5 mm")
-    sk.circle("inner_w / 2 + boot_x", f"{BOARD_CY} + boot_y", "2.5 mm")
+    sk.circle("board_cx + led_x", f"{BOARD_CY} + led_y", "1.5 mm")
+    sk.circle("board_cx + boot_x", f"{BOARD_CY} + boot_y", "2.5 mm")
     extrude(comp, sk.all_profiles(), "1 mm", JOIN, "LED_BOOT_markers", body)
+
+    # Factices de l'option batterie, pour vérifier les interférences
+    p = offset_plane(comp, "floor_t + board_lift", "BAT_PL_tp")
+    sk = Sk(comp, p, "BAT_tp_pcb")
+    sk.rect("tp_cx - tp_w / 2", "inner_l - board_gap - tp_l", "tp_w", "tp_l")
+    tp = extrude(comp, sk.all_profiles(), "tp_pcb_t", NEW, "BAT_TP4056").bodies.item(0)
+    tp.name = "TP4056"
+    p = offset_plane(comp, "floor_t + board_lift + tp_pcb_t", "BAT_PL_tp_top")
+    sk = Sk(comp, p, "BAT_tp_usb")
+    sk.rect("tp_cx - usb_w / 2", "inner_l - board_gap - usb_l", "usb_w", "usb_l")
+    extrude(comp, sk.all_profiles(), "usb_h", JOIN, "BAT_TP_USB_C", tp)
+    p = offset_plane(comp, "floor_t", "BAT_PL_lipo")
+    sk = Sk(comp, p, "BAT_lipo")
+    sk.rect("inner_w / 2 - bat_w / 2", BAT_Y0, "bat_w", "bat_l")
+    extrude(comp, sk.all_profiles(), "bat_t", NEW, "BAT_LiPo").bodies.item(0).name = "LiPo"
 
 
 def build_switches(comp):
@@ -520,11 +582,12 @@ def new_comp(parent, name, m=None):
     return occ
 
 
-def apply_battery_option(case_comp):
+def apply_battery_option(comps):
     off = design.userParameters.itemByName("battery").value < 0.5
-    for f in list(case_comp.features.extrudeFeatures):
-        if f.name.startswith("BAT_"):
-            f.timelineObject.isSuppressed = off
+    for comp in comps:
+        for f in list(comp.features.extrudeFeatures):
+            if f.name.startswith("BAT_"):
+                f.timelineObject.isSuppressed = off
 
 
 def run(_context):
@@ -540,8 +603,10 @@ def run(_context):
     asm = new_comp(root, "MiniKB_Assembly").component
     case = new_comp(asm, "Case").component
     build_case(case)
-    build_plate(new_comp(asm, "Plate").component)
-    build_board(new_comp(asm, "Board_SuperMini").component)
+    plate = new_comp(asm, "Plate").component
+    build_plate(plate)
+    board = new_comp(asm, "Board_SuperMini").component
+    build_board(board)
     build_switches(new_comp(asm, "Switches_dummy").component)
 
     ups = design.userParameters
@@ -559,5 +624,9 @@ def run(_context):
     k2 = new_comp(root, "Keycap_2u", translate(-ev("wall") - 3.5, ev("inner_l") / 2, 0))
     build_keycap(k2.component, 2, "")
 
-    apply_battery_option(case)
+    apply_battery_option([case, plate, board])
+    for name in OBSOLETE:
+        p = design.userParameters.itemByName(name)
+        if p:
+            p.deleteMe()
     print(f"MiniKB: {cols}x{rows}, inner {ev('inner_w') * 10:.2f} x {ev('inner_l') * 10:.2f} mm")

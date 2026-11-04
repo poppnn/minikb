@@ -23,8 +23,14 @@ Chaque variante est enregistrée dans Fusion (projet « 1 », dossier `MiniKB`) 
 | 4 | 2 × 2 | MiniKB 4 touches (2x2) | 44,9 × 76,9 × 15 mm | 0, 1, 3, 4 |
 | 6 | 2 × 3 | MiniKB 6 touches (2x3) | 44,9 × 96,0 × 15 mm | 0, 1, 3, 4, 5, 6 |
 | 8 | 2 × 4 | MiniKB 8 touches (2x4) | 44,9 × 115,0 × 15 mm | 0, 1, 3, 4, 5, 6, 7, 10 |
+| 2 + batterie | 2 × 1 | MiniKB 2 touches batterie (2x1) | 44,9 × 97,3 × 15 mm | 0, 1 |
+| 4 + batterie | 2 × 2 | MiniKB 4 touches batterie (2x2) | 44,9 × 116,4 × 15 mm | 0, 1, 3, 4 |
+| 6 + batterie | 2 × 3 | MiniKB 6 touches batterie (2x3) | 44,9 × 135,5 × 15 mm | 0, 1, 3, 4, 5, 6 |
+| 8 + batterie | 2 × 4 | MiniKB 8 touches batterie (2x4) | 44,9 × 154,5 × 15 mm | 0, 1, 3, 4, 5, 6, 7, 10 |
 
-Pour chaque variante : timeline sans erreur, toutes les pièces fermées (manifold), et aucune interférence vérifiée sur la 2 touches, la plus compacte. Le firmware reste le même : la config par défaut a 8 touches, supprime celles en trop dans le web UI. Jusqu'à 4 touches, toutes peuvent réveiller le clavier de la veille (GPIO 0 à 5).
+Les variantes batterie sont dans `variants/<n>_touches_batterie/`.
+
+Pour chaque variante : timeline sans erreur, toutes les pièces fermées (manifold), et aucune interférence (vérifiée sur la 2 touches sans batterie, la plus compacte, et sur les quatre variantes batterie). Le firmware reste le même : la config par défaut a 8 touches, supprime celles en trop dans le web UI. Jusqu'à 4 touches, toutes peuvent réveiller le clavier de la veille (GPIO 0 à 5).
 
 ## Ce qu'il faut acheter
 
@@ -33,7 +39,7 @@ Pour chaque variante : timeline sans erreur, toutes les pièces fermées (manifo
 - 4 inserts filetés à chaud M2, Ø ext. 3,2 mm, longueur 4 mm (ou M2.5 : passer `screw_d` = 2.5 et `insert_d` = 4)
 - 4 vis M2 × 6 mm, tête cylindrique ou bombée
 - Fil fin (AWG 26-28), un peu d'adhésif double face ou de mousse pour tenir la carte en place
-- Option batterie : LiPo 103450 (~1000 mAh, 50 × 34 × 10 mm), module TP4056 avec protection, interrupteur à glissière SS12D00
+- Option batterie : LiPo 502030 (~250 mAh, 5 × 20 × 30 mm, avec connecteur ou fils), module TP4056 USB-C avec protection (28 × 17,5 mm), interrupteur à glissière SS12D00
 
 ## Impression
 
@@ -78,9 +84,17 @@ Pour reconstruire depuis Fusion : Utilitaires → Scripts et compléments → `+
 
 ## Option batterie
 
-Mets `battery = 1`. Le boîtier s'allonge de `bat_zone` (73,5 mm, soit 188,5 mm au total). Ensuite, réactive les deux fonctions `BAT_tp_usb_cut` et `BAT_switch_cut` dans la timeline du composant Case (clic droit → Annuler la suppression), ou relance le script. Le TP4056 se place derrière la batterie, avec son USB sur la paroi droite. L'interrupteur se monte sur la paroi gauche. La batterie et le TP4056 se fixent à l'adhésif double face.
+Mets `battery = 1`, puis relance `minikb_fusion.py`. Le script active alors toutes les fonctions `BAT_*` (boîtier, plaque, pièces factices) ; il les suspend quand `battery = 0`.
 
-Avec la batterie, alimente la SuperMini par sa broche 5V depuis la sortie OUT+ du TP4056, via l'interrupteur. Ne branche jamais l'USB de la SuperMini et la batterie en même temps sans diode.
+- **À l'arrière** : la SuperMini à gauche et le TP4056 à droite, chacun dans son berceau. Les deux berceaux partagent une butée, et les deux USB-C sortent **côte à côte par la paroi arrière** (entraxe 19,35 mm, 8,35 mm de paroi entre les deux découpes). Le boîtier ne s'élargit pas : les deux cartes tiennent pile dans les 40,1 mm intérieurs d'une grille à 2 colonnes, donc garde `cols` ≥ 2.
+- **Au milieu** : la LiPo se pose à plat sur le fond entre les touches et les cartes, tenue par deux rails latéraux de 2 mm. Le boîtier s'allonge de 39,5 mm : `bat_zone` (34 mm) pour la LiPo, plus 5,5 mm parce que le TP4056 est plus long que la SuperMini.
+- **Piliers arrière** : ils avancent de part et d'autre de la LiPo, car les berceaux occupent toute la largeur.
+- **Interrupteur** : il passe par la paroi gauche, au niveau de la LiPo.
+- **Plaque** : un trou de 3 mm au-dessus de la LED de charge du TP4056.
+
+Câblage : LiPo → B+/B- du TP4056, OUT+ → interrupteur → broche 5V de la SuperMini, OUT- → GND. Ne branche pas l'USB de la SuperMini pendant que l'interrupteur est sur ON : la sortie du TP4056 et l'USB seraient reliées sans diode. Pour charger, branche l'USB-C du TP4056 ; pour flasher, mets l'interrupteur sur OFF puis branche l'USB-C de la SuperMini.
+
+Pour une autre batterie, change `bat_l` (sens avant-arrière), `bat_w` et `bat_t`. Avec la grille à 2 colonnes, `bat_w` peut aller jusqu'à environ 24 mm sans toucher les piliers.
 
 ## Cotes à vérifier sur ton matériel
 
@@ -91,6 +105,8 @@ Ces valeurs sont des paramètres, avec un défaut raisonnable. Mesure-les sur te
 | `led_x`, `led_y`, `boot_x`, `boot_y` | (4 ; 2), (-5,5 ; 7,5) mm depuis le centre de la carte, +Y vers l'USB | L'implantation varie selon les clones de SuperMini. **À mesurer en priorité.** |
 | `pcb_t` | 1,0 mm | Épaisseur du PCB, qui fixe la hauteur de la découpe USB-C. |
 | `sw_housing`, `sw_stem_top` | 6,6 et 11,6 mm au-dessus de la plaque | Fixent la hauteur des keycaps dans l'assemblage. Varie un peu selon la marque. |
+| `tp_l`, `tp_w`, `tp_pcb_t` | 28 × 17,5 mm, PCB 1 mm | Format courant du TP4056 USB-C avec protection. Fixent le berceau et la hauteur de sa découpe USB. |
+| `tp_led_x`, `tp_led_y` | (0 ; -6) mm depuis le centre du TP4056, +Y vers l'USB | Position de la LED de charge, variable selon les modules. |
 | `insert_d` | 3,2 mm | Dépend de la marque des inserts. |
 | `stem_d` | 5,5 mm | Standard MX. La paroi en bout de bras de croix ne fait que 0,7 mm. 5,7 donnerait 0,8 mm, mais risque de frotter dans le boîtier du switch en fin de course. |
 
@@ -98,7 +114,7 @@ Ces valeurs sont des paramètres, avec un défaut raisonnable. Mesure-les sur te
 
 - Timeline : 182 éléments, aucune erreur. Toutes les esquisses sont totalement contraintes, sauf les légendes (un texte ne se contraint pas).
 - Régénération : 2 × 4 → 3 × 3 → 2 × 4 sans erreur.
-- Option batterie : `battery = 1`, découpes saines, longueur de 188,5 mm.
+- Option batterie (quatre tailles) : timeline saine, esquisses contraintes, 0 interférence entre boîtier, plaque, SuperMini, TP4056, LiPo et switches. Les découpes USB sont centrées sur les deux prises.
 - Jeu entre keycaps voisines : 1,05 mm partout (minimum demandé : 0,8).
 - Interférences dans l'assemblage au repos : 0.
 - Alignements mesurés : trous LED/BOOT centrés sur les repères de la carte, trous de vis sur les inserts, découpe USB-C centrée sur la prise (X 20,05 mm, Z 6,1 mm), keycaps centrées sur les switches.
