@@ -58,6 +58,7 @@ PARAMS = [
     ("boot_y", "7.5 mm", "mm", "Bouton BOOT, +Y vers l'USB, à vérifier"),
     ("boot_hole", "2 mm", "mm", "Trou d'accès BOOT (trombone)"),
     ("battery", "0", "", "1 = petite LiPo + TP4056 USB-C (relancer le script après changement)"),
+    ("front_tp", "0", "", "1 = TP4056 sous les touches avant, USB-C en façade (relancer le script)"),
     ("tp_l", "28 mm", "mm", "Longueur TP4056 USB-C avec protection, à vérifier"),
     ("tp_w", "17.5 mm", "mm", "Largeur TP4056, à vérifier"),
     ("tp_pcb_t", "1 mm", "mm", "Épaisseur PCB TP4056, à vérifier"),
@@ -348,24 +349,34 @@ def outer_xy():
 BAT_Y0 = "front_margin + rows * key_pitch + 2 mm"  # début de la zone LiPo
 
 
-def cradle(comp, plane, body, cx, w, l, height, prefix):
-    """Butées en U ouvertes vers la paroi arrière + appuis sous les bords de la carte."""
+def cradle(comp, plane, body, cx, w, l, height, prefix, front=False):
+    """Butées en U ouvertes vers la paroi arrière (ou avant) + appuis sous les bords de la carte."""
     sk = Sk(comp, plane, prefix + "cradle")
-    y = f"inner_l - board_gap - {l}"
-    sk.rect(f"{cx} - {w} / 2 - tolerance - cradle_wall", f"{y} - tolerance - cradle_wall",
-            f"{w} + 2 * tolerance + 2 * cradle_wall", f"{l} + tolerance + cradle_wall + board_gap + wall / 2")
-    sk.rect(f"{cx} - {w} / 2 - tolerance", f"{y} - tolerance", f"{w} + 2 * tolerance", f"{l} + tolerance + board_gap + wall / 4")
+    ow, iw = f"{w} + 2 * tolerance + 2 * cradle_wall", f"{w} + 2 * tolerance"
+    if front:
+        y = "board_gap"
+        sk.rect(f"{cx} - {w} / 2 - tolerance - cradle_wall", "wall / 2", ow, f"wall / 2 + board_gap + {l} + tolerance + cradle_wall", sy=-1)
+        sk.rect(f"{cx} - {w} / 2 - tolerance", "wall / 4", iw, f"wall / 4 + board_gap + {l} + tolerance", sy=-1)
+        cy = ev(f"board_gap + {l} / 2")
+    else:
+        y = f"inner_l - board_gap - {l}"
+        sk.rect(f"{cx} - {w} / 2 - tolerance - cradle_wall", f"{y} - tolerance - cradle_wall",
+                ow, f"{l} + tolerance + cradle_wall + board_gap + wall / 2")
+        sk.rect(f"{cx} - {w} / 2 - tolerance", f"{y} - tolerance", iw, f"{l} + tolerance + board_gap + wall / 4")
+        cy = ev(f"inner_l - board_gap - {l} / 2")
     sk.rect(f"{cx} - {w} / 2 + ledge_w", f"{y} + ledge_w", f"{w} - 2 * ledge_w", f"{l} - 2 * ledge_w")
-    cy = ev(f"inner_l - board_gap - {l} / 2")
     extrude(comp, [sk.profile_at(ev(f"{cx} - {w} / 2 - tolerance - cradle_wall / 2"), cy)], height, JOIN, prefix + "stops", body)
     extrude(comp, [sk.profile_at(ev(f"{cx} - {w} / 2 + ledge_w / 2"), cy)], "board_lift", JOIN, prefix + "ledge", body)
 
 
-def usb_cutout(comp, body, cx, pcb, prefix):
-    """Découpe USB-C dans la paroi arrière, centrée sur la prise d'une carte posée sur ses appuis."""
+def usb_cutout(comp, body, cx, pcb, prefix, front=False):
+    """Découpe USB-C dans la paroi arrière (ou avant), centrée sur la prise d'une carte posée sur ses appuis."""
     p = offset_plane(comp, f"floor_t + board_lift + {pcb} + usb_h / 2 - usb_cut_h / 2", prefix + "PL")
     sk = Sk(comp, p, prefix + "cut")
-    sk.rect(f"{cx} - usb_cut_w / 2", "inner_l - 1 mm", "usb_cut_w", "wall + 2 mm")
+    if front:
+        sk.rect(f"{cx} - usb_cut_w / 2", "wall + 1 mm", "usb_cut_w", "wall + 2 mm", sy=-1)
+    else:
+        sk.rect(f"{cx} - usb_cut_w / 2", "inner_l - 1 mm", "usb_cut_w", "wall + 2 mm")
     extrude(comp, sk.all_profiles(), "usb_cut_h", CUT, prefix + "cutout", body)
 
 
@@ -412,6 +423,10 @@ def build_case(comp):
     sk.rect("wall + 1 mm", f"{BAT_Y0} + bat_l / 2 - sw_hole_w / 2", "wall + 2 mm", "sw_hole_w", sx=-1)
     extrude(comp, sk.all_profiles(), "sw_hole_h", CUT, "BAT_switch_cut", body)
 
+    # Option front_tp (features FTP_*) : TP4056 sous les touches avant, USB-C dans la façade
+    cradle(comp, p_floor, body, "inner_w / 2", "tp_w", "tp_l", "board_lift + tp_pcb_t + 1 mm", "FTP_tp_", front=True)
+    usb_cutout(comp, body, "inner_w / 2", "tp_pcb_t", "FTP_usb_", front=True)
+
     chamfer(comp, outer_loop_edges(planar_face_at_z(body, 0, -1)), "ef_chamfer", "Elephant_foot")
     return body
 
@@ -433,6 +448,12 @@ def build_plate(comp):
     sk.rect("tolerance + lip_t", "tolerance + lip_t", "inner_w - 2 * tolerance - 2 * lip_t", "inner_l - 2 * tolerance - 2 * lip_t")
     lip_mid = ev("tolerance + lip_t / 2")
     extrude(comp, [sk.profile_at(lip_mid, ev("inner_l") / 2)], "-lip_h", JOIN, "Lip", body)
+    # shortcut: décidé à la construction, relancer le script si pillar_d ou pillar_inset change
+    if ev("pillar_inset - pillar_d / 2 - tolerance") < ev("tolerance + lip_t"):
+        sk = Sk(comp, p_under, "PLATE_lip_relief")
+        for x, y in PILLARS:
+            sk.circle(x, y, "pillar_d + 2 * tolerance")
+        extrude(comp, sk.all_profiles(), "-lip_h", CUT, "Lip_relief", body)
 
     # Découpe MX de la touche (0, 0) avec encoches latérales, puis motif cols x rows
     sk = Sk(comp, p_top, "PLATE_switch")
@@ -489,6 +510,15 @@ def build_board(comp):
     sk = Sk(comp, p, "BAT_lipo")
     sk.rect("inner_w / 2 - bat_w / 2", BAT_Y0, "bat_w", "bat_l")
     extrude(comp, sk.all_profiles(), "bat_t", NEW, "BAT_LiPo").bodies.item(0).name = "LiPo"
+    p = offset_plane(comp, "floor_t + board_lift", "FTP_PL_tp")
+    sk = Sk(comp, p, "FTP_tp_pcb")
+    sk.rect("inner_w / 2 - tp_w / 2", "board_gap", "tp_w", "tp_l")
+    ftp = extrude(comp, sk.all_profiles(), "tp_pcb_t", NEW, "FTP_TP4056").bodies.item(0)
+    ftp.name = "TP4056_front"
+    p = offset_plane(comp, "floor_t + board_lift + tp_pcb_t", "FTP_PL_tp_top")
+    sk = Sk(comp, p, "FTP_tp_usb")
+    sk.rect("inner_w / 2 - usb_w / 2", "board_gap", "usb_w", "usb_l")
+    extrude(comp, sk.all_profiles(), "usb_h", JOIN, "FTP_TP_USB_C", ftp)
 
 
 def build_switches(comp):
@@ -582,12 +612,13 @@ def new_comp(parent, name, m=None):
     return occ
 
 
-def apply_battery_option(comps):
-    off = design.userParameters.itemByName("battery").value < 0.5
-    for comp in comps:
-        for f in list(comp.features.extrudeFeatures):
-            if f.name.startswith("BAT_"):
-                f.timelineObject.isSuppressed = off
+def apply_options(comps):
+    for prefix, name in (("BAT_", "battery"), ("FTP_", "front_tp")):
+        off = design.userParameters.itemByName(name).value < 0.5
+        for comp in comps:
+            for f in list(comp.features.extrudeFeatures):
+                if f.name.startswith(prefix):
+                    f.timelineObject.isSuppressed = off
 
 
 def run(_context):
@@ -624,7 +655,7 @@ def run(_context):
     k2 = new_comp(root, "Keycap_2u", translate(-ev("wall") - 3.5, ev("inner_l") / 2, 0))
     build_keycap(k2.component, 2, "")
 
-    apply_battery_option([case, plate, board])
+    apply_options([case, plate, board])
     for name in OBSOLETE:
         p = design.userParameters.itemByName(name)
         if p:

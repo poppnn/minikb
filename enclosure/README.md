@@ -20,7 +20,7 @@ Chaque variante est enregistrée dans Fusion (projet « 1 », dossier `MiniKB`) 
 | Touches | Grille | Document Fusion | Boîtier (L × l × h) | GPIO par défaut |
 |---|---|---|---|---|
 | 2 | 2 × 1 | MiniKB 2 touches (2x1) | 44,9 × 57,9 × 15 mm | 0, 1 |
-| 4 | 2 × 2 | MiniKB 4 touches (2x2) | 44,9 × 76,9 × 15 mm | 0, 1, 3, 4 |
+| 4 | 2 × 2 | MiniKB 4 touches (2x2) | 44,9 × 76,9 × 20 mm | 0, 1, 3, 4 |
 | 6 | 2 × 3 | MiniKB 6 touches (2x3) | 44,9 × 96,0 × 15 mm | 0, 1, 3, 4, 5, 6 |
 | 8 | 2 × 4 | MiniKB 8 touches (2x4) | 44,9 × 115,0 × 15 mm | 0, 1, 3, 4, 5, 6, 7, 10 |
 | 2 + batterie | 2 × 1 | MiniKB 2 touches batterie (2x1) | 44,9 × 97,3 × 15 mm | 0, 1 |
@@ -30,13 +30,13 @@ Chaque variante est enregistrée dans Fusion (projet « 1 », dossier `MiniKB`) 
 
 Les variantes batterie sont dans `variants/<n>_touches_batterie/`.
 
-**4 touches sans batterie : vis M3 × 14 sans insert.** Ce document seul (`MiniKB 4 touches (2x2)` et `variants/4_touches/`) est réglé pour des vis M3 de 14 mm vissées directement dans le plastique :
-- trous de 3,4 mm dans la plaque ;
-- avant-trous de 2,6 mm dans les piliers, qui passent à Ø 6,4 mm ;
-- 12,5 mm de filet en prise, la pointe s'arrêtant 0,4 mm au-dessus du fond du trou ;
-- paramètres `screw_d` = 3, `insert_d` = 2,6, `insert_depth` = 12,9, `pillar_d` = 6,4 et `pillar_inset` = 4,8.
+**4 touches sans batterie : inserts M3, vis M3 × 14 et TP4056 en façade.** Ce document seul (`MiniKB 4 touches (2x2)` et `variants/4_touches/`) diffère des autres :
+- boîtier épaissi à 20 mm (`case_height`), même plaque, même empreinte et même entraxe des vis ;
+- inserts M3 à chaud dans des trous de Ø 4 mm (`insert_d`), profonds de 13 mm (`insert_depth`) pour laisser passer le reste de la vis ; piliers Ø 7,2 mm (`pillar_d`), la lèvre de la plaque est dégagée autour ;
+- vis M3 × 14 : pointe à 6 mm du dessous, fond du trou à 5,5 mm ;
+- TP4056 USB-C 19 × 16 mm (`tp_l`, `tp_w`) sous les touches avant, prise dans la façade, ESP32-C3 à l'arrière (`front_tp` = 1) ; 4 mm de jeu entre le haut de sa prise et les pattes des switches pour les fils.
 
-Visse doucement la première fois, sans forcer en fin de course. Les autres variantes et le script restent en M2 + inserts.
+Enfonce les inserts à fleur du haut des piliers : le trou continue en dessous, ne pousse pas plus loin. La LED de charge du TP4056 n'est pas visible (sous les touches). Les autres variantes et les valeurs par défaut du script restent en M2 + inserts, sans `front_tp`.
 
 Pour chaque variante : timeline sans erreur, toutes les pièces fermées (manifold), et aucune interférence (vérifiée sur la 2 touches sans batterie, la plus compacte, et sur les quatre variantes batterie). Le firmware reste le même : la config par défaut a 8 touches, supprime celles en trop dans le web UI. Jusqu'à 4 touches, toutes peuvent réveiller le clavier de la veille (GPIO 0 à 5).
 
