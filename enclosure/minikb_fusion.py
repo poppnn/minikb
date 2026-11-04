@@ -63,6 +63,7 @@ PARAMS = [
     ("boot_hole", "2 mm", "mm", "Trou d'accès BOOT (trombone)"),
     ("battery", "0", "", "1 = petite LiPo + TP4056 USB-C (relancer le script après changement)"),
     ("front_tp", "0", "", "1 = TP4056 sous les touches avant, USB-C en façade (relancer le script)"),
+    ("ftp_sw_y", "inner_l / 2", "mm", "Axe de l'interrupteur dans la paroi gauche (option front_tp)"),
     ("tp_l", "28 mm", "mm", "Longueur TP4056 USB-C avec protection, à vérifier"),
     ("tp_w", "17.5 mm", "mm", "Largeur TP4056, à vérifier"),
     ("tp_pcb_t", "1 mm", "mm", "Épaisseur PCB TP4056, à vérifier"),
@@ -460,6 +461,11 @@ def build_case(comp):
     # Option front_tp (features FTP_*) : TP4056 sous les touches avant, USB-C dans la façade
     cradle(comp, p_floor, body, "inner_w / 2", "tp_w", "tp_l", "board_lift + tp_pcb_t + 1 mm", "FTP_tp_", front=True)
     usb_cutout(comp, body, "inner_w / 2", "tp_pcb_t", "FTP_usb_", front=True, w="tp_w", overhang="tp_usb_overhang")
+    # Interrupteur à glissière dans la paroi gauche, entre le TP4056 et la SuperMini
+    p = offset_plane(comp, "floor_t + sw_hole_z - sw_hole_h / 2", "FTP_PL_switch")
+    sk = Sk(comp, p, "FTP_switch")
+    sk.rect("wall + 1 mm", "ftp_sw_y - sw_hole_w / 2", "wall + 2 mm", "sw_hole_w", sx=-1)
+    extrude(comp, sk.all_profiles(), "sw_hole_h", CUT, "FTP_switch_cut", body)
 
     chamfer(comp, outer_loop_edges(planar_face_at_z(body, 0, -1)), "ef_chamfer", "Elephant_foot")
     return body
