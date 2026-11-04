@@ -36,6 +36,8 @@ Les variantes batterie sont dans `variants/<n>_touches_batterie/`.
 - vis M3 × 14 : pointe à 6 mm du dessous, fond du trou à 5,5 mm ;
 - TP4056 USB-C 19 × 16 mm (`tp_l`, `tp_w`) sous les touches avant, prise dans la façade, ESP32-C3 à l'arrière (`front_tp` = 1) ; 4 mm de jeu entre le haut de sa prise et les pattes des switches pour les fils.
 
+- prises USB-C à fleur de la face (`usb_flush` = 1) : le bord de chaque carte entre dans une poche de la paroi, et il ne reste devant qu'une peau de 0,8 mm percée juste à la forme de la prise (oblong, 0,2 mm de jeu). Cette peau empêche aussi la carte de ressortir. **Mesure de combien la prise dépasse du PCB sur tes cartes** et reporte-le dans `usb_overhang` (SuperMini) et `tp_usb_overhang` (TP4056), 0,8 mm par défaut : c'est l'épaisseur de la peau. Pour poser une carte, engage d'abord la prise dans son trou, carte légèrement inclinée, puis rabats l'autre bout dans le berceau.
+
 Enfonce les inserts à fleur du haut des piliers : le trou continue en dessous, ne pousse pas plus loin. La LED de charge du TP4056 n'est pas visible (sous les touches). Les autres variantes et les valeurs par défaut du script restent en M2 + inserts, sans `front_tp`.
 
 Pour chaque variante : timeline sans erreur, toutes les pièces fermées (manifold), et aucune interférence (vérifiée sur la 2 touches sans batterie, la plus compacte, et sur les quatre variantes batterie). Le firmware reste le même : la config par défaut a 8 touches, supprime celles en trop dans le web UI. Jusqu'à 4 touches, toutes peuvent réveiller le clavier de la veille (GPIO 0 à 5).

@@ -40,7 +40,7 @@ PARAMS = [
     ("board_w", "18 mm", "mm", "Largeur SuperMini"),
     ("board_l", "22.5 mm", "mm", "Longueur SuperMini"),
     ("pcb_t", "1 mm", "mm", "Épaisseur PCB SuperMini à vérifier"),
-    ("board_gap", "0.5 mm", "mm", "Jeu carte - paroi arrière"),
+    ("board_gap", "0.5 mm", "mm", "Jeu carte - paroi arrière (usb_flush : usb_overhang - wall)"),
     ("board_lift", "1.5 mm", "mm", "Hauteur des appuis sous la carte"),
     ("ledge_w", "1.5 mm", "mm", "Largeur des appuis sous la carte"),
     ("cradle_wall", "1.2 mm", "mm", "Épaisseur des butées de la carte"),
@@ -51,6 +51,10 @@ PARAMS = [
     ("usb_x", "0 mm", "mm", "Décalage X de l'USB-C / centre carte"),
     ("usb_cut_w", "11 mm", "mm", "Découpe USB-C largeur (fiche)"),
     ("usb_cut_h", "5 mm", "mm", "Découpe USB-C hauteur"),
+    ("usb_flush", "0", "", "1 = prises USB-C à fleur, paroi ajustée autour (relancer le script)"),
+    ("usb_overhang", "0.8 mm", "mm", "Dépassement de la prise USB-C au-delà du PCB SuperMini, à mesurer"),
+    ("tp_usb_overhang", "0.8 mm", "mm", "Dépassement de la prise USB-C au-delà du PCB TP4056, à mesurer"),
+    ("tp_gap", "board_gap", "mm", "Jeu TP4056 avant - paroi (usb_flush : tp_usb_overhang - wall)"),
     ("led_x", "4 mm", "mm", "LED GPIO8 / centre carte, à vérifier sur ta carte"),
     ("led_y", "2 mm", "mm", "LED GPIO8, +Y vers l'USB, à vérifier"),
     ("led_hole", "3 mm", "mm", "Trou de LED"),
@@ -172,6 +176,12 @@ class Sk:
         if x is None and y is None:
             self.cons.addCoincident(p, self.o)
             return
+        # Une cote est positive : coordonnée négative = expression opposée de l'autre côté.
+        # shortcut: signe figé à la construction, relancer le script s'il change
+        if x is not None and ev(x) < 0:
+            x, sx = f"-({x})", -sx
+        if y is not None and ev(y) < 0:
+            y, sy = f"-({y})", -sy
         if x is None:
             self.cons.addVerticalPoints(self.o, p)
         else:
@@ -253,9 +263,9 @@ class Sk:
         return [p for p in self.s.profiles]
 
 
-def offset_plane(comp, expr, name):
+def offset_plane(comp, expr, name, base=None):
     inp = comp.constructionPlanes.createInput()
-    inp.setByOffset(comp.xYConstructionPlane, vi(expr))
+    inp.setByOffset(base or comp.xYConstructionPlane, vi(expr))
     p = comp.constructionPlanes.add(inp)
     p.name = name
     return p
@@ -354,10 +364,10 @@ def cradle(comp, plane, body, cx, w, l, height, prefix, front=False):
     sk = Sk(comp, plane, prefix + "cradle")
     ow, iw = f"{w} + 2 * tolerance + 2 * cradle_wall", f"{w} + 2 * tolerance"
     if front:
-        y = "board_gap"
-        sk.rect(f"{cx} - {w} / 2 - tolerance - cradle_wall", "wall / 2", ow, f"wall / 2 + board_gap + {l} + tolerance + cradle_wall", sy=-1)
-        sk.rect(f"{cx} - {w} / 2 - tolerance", "wall / 4", iw, f"wall / 4 + board_gap + {l} + tolerance", sy=-1)
-        cy = ev(f"board_gap + {l} / 2")
+        y = "tp_gap"
+        sk.rect(f"{cx} - {w} / 2 - tolerance - cradle_wall", "wall / 2", ow, f"wall / 2 + tp_gap + {l} + tolerance + cradle_wall", sy=-1)
+        sk.rect(f"{cx} - {w} / 2 - tolerance", "wall / 4", iw, f"wall / 4 + tp_gap + {l} + tolerance", sy=-1)
+        cy = ev(f"tp_gap + {l} / 2")
     else:
         y = f"inner_l - board_gap - {l}"
         sk.rect(f"{cx} - {w} / 2 - tolerance - cradle_wall", f"{y} - tolerance - cradle_wall",
@@ -369,8 +379,10 @@ def cradle(comp, plane, body, cx, w, l, height, prefix, front=False):
     extrude(comp, [sk.profile_at(ev(f"{cx} - {w} / 2 + ledge_w / 2"), cy)], "board_lift", JOIN, prefix + "ledge", body)
 
 
-def usb_cutout(comp, body, cx, pcb, prefix, front=False):
+def usb_cutout(comp, body, cx, pcb, prefix, front=False, w="board_w", overhang="usb_overhang"):
     """Découpe USB-C dans la paroi arrière (ou avant), centrée sur la prise d'une carte posée sur ses appuis."""
+    if design.userParameters.itemByName("usb_flush").value > 0.5:
+        return usb_flush_cutout(comp, body, cx, pcb, prefix, front, w, overhang)
     p = offset_plane(comp, f"floor_t + board_lift + {pcb} + usb_h / 2 - usb_cut_h / 2", prefix + "PL")
     sk = Sk(comp, p, prefix + "cut")
     if front:
@@ -378,6 +390,28 @@ def usb_cutout(comp, body, cx, pcb, prefix, front=False):
     else:
         sk.rect(f"{cx} - usb_cut_w / 2", "inner_l - 1 mm", "usb_cut_w", "wall + 2 mm")
     extrude(comp, sk.all_profiles(), "usb_cut_h", CUT, prefix + "cutout", body)
+
+
+def usb_flush_cutout(comp, body, cx, pcb, prefix, front, w, overhang):
+    """Prise à fleur : le bord du PCB entre dans une poche de la paroi, il reste une peau de {overhang}
+    percée juste à la forme de la prise (oblong). La peau bloque la carte vers l'extérieur."""
+    # Poche du PCB, de l'intérieur jusqu'à la peau
+    p = offset_plane(comp, "floor_t + board_lift - tolerance", prefix + "PL")
+    sk = Sk(comp, p, prefix + "pocket")
+    if front:
+        sk.rect(f"{cx} - {w} / 2 - tolerance", f"wall - {overhang}", f"{w} + 2 * tolerance", f"wall - {overhang} + 1 mm", sy=-1)
+    else:
+        sk.rect(f"{cx} - {w} / 2 - tolerance", "inner_l - 1 mm", f"{w} + 2 * tolerance", f"wall - {overhang} + 1 mm")
+    extrude(comp, sk.all_profiles(), f"{pcb} + 2 * tolerance", CUT, prefix + "pocket", body)
+    # Oblong de la prise dans toute l'épaisseur (esquisse XZ : y esquisse = -Z)
+    p = offset_plane(comp, "-wall - 1 mm" if front else "inner_l + wall + 1 mm", prefix + "PL_face", comp.xZConstructionPlane)
+    sk = Sk(comp, p, prefix + "slot")
+    z, r = f"floor_t + board_lift + {pcb} + usb_h / 2", "(usb_h / 2 + tolerance)"
+    for sx in ("-", "+"):
+        sk.circle(f"{cx} {sx} (usb_w - usb_h) / 2", z, "usb_h + 2 * tolerance", sy=-1)
+    sk.rect(f"{cx} - (usb_w - usb_h) / 2", f"{z} + {r}", "usb_w - usb_h", f"2 * {r}", sy=-1)  # coin bas-gauche esquisse = haut en Z
+    depth = "wall + 2 mm"
+    extrude(comp, sk.all_profiles(), depth if front else f"-({depth})", CUT, prefix + "cutout", body)
 
 
 def build_case(comp):
@@ -412,7 +446,7 @@ def build_case(comp):
 
     # Option batterie (features BAT_*, suspendues si battery = 0)
     cradle(comp, p_floor, body, "tp_cx", "tp_w", "tp_l", "board_lift + tp_pcb_t + 1 mm", "BAT_tp_")
-    usb_cutout(comp, body, "tp_cx", "tp_pcb_t", "BAT_tp_usb_")
+    usb_cutout(comp, body, "tp_cx", "tp_pcb_t", "BAT_tp_usb_", w="tp_w", overhang="tp_usb_overhang")
     # Rails de la LiPo, posée à plat entre les touches et les cartes
     sk = Sk(comp, p_floor, "BAT_lipo_rails")
     for x in ("inner_w / 2 - bat_w / 2 - tolerance - cradle_wall", "inner_w / 2 + bat_w / 2 + tolerance"):
@@ -425,7 +459,7 @@ def build_case(comp):
 
     # Option front_tp (features FTP_*) : TP4056 sous les touches avant, USB-C dans la façade
     cradle(comp, p_floor, body, "inner_w / 2", "tp_w", "tp_l", "board_lift + tp_pcb_t + 1 mm", "FTP_tp_", front=True)
-    usb_cutout(comp, body, "inner_w / 2", "tp_pcb_t", "FTP_usb_", front=True)
+    usb_cutout(comp, body, "inner_w / 2", "tp_pcb_t", "FTP_usb_", front=True, w="tp_w", overhang="tp_usb_overhang")
 
     chamfer(comp, outer_loop_edges(planar_face_at_z(body, 0, -1)), "ef_chamfer", "Elephant_foot")
     return body
@@ -489,7 +523,7 @@ def build_board(comp):
     body.name = "SuperMini"
     p = offset_plane(comp, "floor_t + board_lift + pcb_t", "PL_board_top")
     sk = Sk(comp, p, "BOARD_usb")
-    sk.rect("board_cx + usb_x - usb_w / 2", "inner_l - board_gap - usb_l", "usb_w", "usb_l")
+    sk.rect("board_cx + usb_x - usb_w / 2", "inner_l - board_gap + usb_overhang - usb_l", "usb_w", "usb_l")
     extrude(comp, sk.all_profiles(), "usb_h", JOIN, "USB_C", body)
     sk = Sk(comp, p, "BOARD_led_boot")
     sk.circle("board_cx + led_x", f"{BOARD_CY} + led_y", "1.5 mm")
@@ -504,7 +538,7 @@ def build_board(comp):
     tp.name = "TP4056"
     p = offset_plane(comp, "floor_t + board_lift + tp_pcb_t", "BAT_PL_tp_top")
     sk = Sk(comp, p, "BAT_tp_usb")
-    sk.rect("tp_cx - usb_w / 2", "inner_l - board_gap - usb_l", "usb_w", "usb_l")
+    sk.rect("tp_cx - usb_w / 2", "inner_l - board_gap + tp_usb_overhang - usb_l", "usb_w", "usb_l")
     extrude(comp, sk.all_profiles(), "usb_h", JOIN, "BAT_TP_USB_C", tp)
     p = offset_plane(comp, "floor_t", "BAT_PL_lipo")
     sk = Sk(comp, p, "BAT_lipo")
@@ -512,12 +546,12 @@ def build_board(comp):
     extrude(comp, sk.all_profiles(), "bat_t", NEW, "BAT_LiPo").bodies.item(0).name = "LiPo"
     p = offset_plane(comp, "floor_t + board_lift", "FTP_PL_tp")
     sk = Sk(comp, p, "FTP_tp_pcb")
-    sk.rect("inner_w / 2 - tp_w / 2", "board_gap", "tp_w", "tp_l")
+    sk.rect("inner_w / 2 - tp_w / 2", "tp_gap", "tp_w", "tp_l")
     ftp = extrude(comp, sk.all_profiles(), "tp_pcb_t", NEW, "FTP_TP4056").bodies.item(0)
     ftp.name = "TP4056_front"
     p = offset_plane(comp, "floor_t + board_lift + tp_pcb_t", "FTP_PL_tp_top")
     sk = Sk(comp, p, "FTP_tp_usb")
-    sk.rect("inner_w / 2 - usb_w / 2", "board_gap", "usb_w", "usb_l")
+    sk.rect("inner_w / 2 - usb_w / 2", "tp_gap - tp_usb_overhang", "usb_w", "usb_l")
     extrude(comp, sk.all_profiles(), "usb_h", JOIN, "FTP_TP_USB_C", ftp)
 
 
