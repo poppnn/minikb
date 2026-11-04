@@ -1,5 +1,6 @@
 // MiniKB : clavier de macros BLE. Mode normal = BLE HID, mode config = Wi-Fi AP + web UI.
 #include <Arduino.h>
+#include <WiFi.h>
 #include <esp_attr.h>
 #include "ble_hid.h"
 #include "buttons.h"
@@ -35,12 +36,28 @@ static void sendKey(const KeyConfig& k) {
     hidQueue(strokes);
 }
 
-// Envoyer n'importe quel caractère sur le port série affiche l'état (les logs de boot sont souvent perdus en USB CDC).
+// Port série : un caractère affiche l'état (les logs de boot sont souvent perdus en USB CDC),
+// « c » redémarre en mode config, « n » en mode normal.
 static void printStatus() {
-    Serial.printf("[status] mode %s, BLE %s, %u touche(s), layout %s, AP \"%s\" %s\n",
+    Serial.printf("[status] mode %s, BLE %s, %u touche(s), layout %s, AP \"%s\" %s, appareils Wi-Fi %u, "
+                  "uptime %lus, dernier reset %d, RAM libre %u\n",
                   configMode ? "config" : "normal", hidConnected() ? "connecté" : "en attente",
                   unsigned(cfg.keys.size()), cfg.layout == Layout::FR ? "fr" : "us", AP_SSID,
-                  cfg.apPass.isEmpty() ? "ouvert" : ("mot de passe \"" + cfg.apPass + "\"").c_str());
+                  cfg.apPass.isEmpty() ? "ouvert" : ("mot de passe \"" + cfg.apPass + "\"").c_str(),
+                  configMode ? unsigned(WiFi.softAPgetStationNum()) : 0u, millis() / 1000UL,
+                  int(esp_reset_reason()), unsigned(ESP.getFreeHeap()));
+}
+
+static void handleSerial() {
+    int cmd = 0;
+    while (Serial.available()) cmd = Serial.read();
+    if (cmd == 'c' || cmd == 'n') {
+        Serial.printf("[main] redémarrage en mode %s\n", cmd == 'c' ? "config" : "normal");
+        Serial.flush();
+        bootRequest = cmd == 'c' ? CONFIG_MAGIC : 0;
+        ESP.restart();
+    }
+    printStatus();
 }
 
 void setup() {
@@ -73,10 +90,7 @@ void setup() {
 void loop() {
     uint32_t now = millis();
     updateLed(now);
-    if (Serial.available()) {
-        while (Serial.available()) Serial.read();
-        printStatus();
-    }
+    if (Serial.available()) handleSerial();
     if (configMode) {
         webLoop(now);
         return;

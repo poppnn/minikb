@@ -68,8 +68,12 @@ Si la carte ne se laisse pas flasher : maintiens BOOT, appuie sur RESET, relâch
 1. En fonctionnement normal, maintiens **BOOT 3 secondes**. Le clavier redémarre, coupe le BLE et la LED flashe rapidement.
 2. Connecte le téléphone au Wi-Fi **MiniKB-Config**.
 3. Par défaut, ce réseau est **ouvert**, sans mot de passe. Tu peux en définir un dans la page (8 à 63 caractères) ; le laisser vide rend le réseau à nouveau ouvert.
-4. Ouvre **http://192.168.4.1**.
-5. Après 10 min sans requête, le clavier redémarre en mode normal. « Enregistrer » redémarre aussi.
+4. La page s'ouvre toute seule (portail captif). Sinon, ouvre **http://192.168.4.1**. Si le téléphone signale « pas d'accès à internet », choisis de rester connecté.
+5. Le clavier revient en mode normal 10 min après la déconnexion du dernier appareil. « Enregistrer » redémarre aussi.
+
+Sur la SuperMini, la puissance Wi-Fi est limitée à 8,5 dBm : à pleine puissance, son antenne fait décrocher le point d'accès. La portée reste largement suffisante à quelques mètres.
+
+Depuis le port série, `c` redémarre en mode config sans toucher à BOOT, `n` en mode normal, et tout autre caractère affiche l'état.
 
 Dans la page, tu peux :
 
@@ -140,6 +144,7 @@ cd test/webui && npm install && npx playwright install chromium-headless-shell &
 | La LED clignote mais l'hôte ne voit rien | Supprime l'appareil côté hôte. Le nom BLE a peut-être changé. |
 | Page config « index.html absent » | Lancer `pio run -t uploadfs`. |
 | Mot de passe Wi-Fi oublié | Envoie un caractère sur le port série : la ligne `[status]` l'affiche. Sinon, réflashe en effaçant l'appareil (retour au réseau ouvert). |
+| Le Wi-Fi config se coupe | Mets à jour le firmware (puissance limitée à 8,5 dBm, portail captif). Si le téléphone propose de quitter un réseau sans internet, refuse. |
 | LED éteinte après un flash | Appuie sur RST : le reset par USB laisse la SuperMini en mode téléchargement. |
 | Une touche ne répond pas | Vérifie la soudure et le GND commun. Un pin interdit est refusé à l'enregistrement. |
 | Caractère ignoré | Message `[keymap] caractère non supporté` sur le port série. Utilise le bouton Tester du web UI. |
