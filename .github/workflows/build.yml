@@ -1,0 +1,70 @@
+name: Build, tests et web flasher
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+      - run: pip install platformio esptool
+
+      - name: Tests natifs (keymap)
+        run: pio test -e native
+
+      - name: Firmware + LittleFS (C3, S3)
+        run: |
+          pio run -e esp32c3 -e esp32s3
+          pio run -e esp32c3 -t buildfs
+          pio run -e esp32s3 -t buildfs
+          python tools/merge_bin.py esp32c3 esp32s3
+
+      - name: Tests web UI (Playwright)
+        working-directory: test/webui
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium-headless-shell
+          npx playwright test
+
+      - name: Site du web flasher
+        run: |
+          mkdir -p _site
+          cp -r webflasher/* _site/
+          sed -i "s/\"version\": \"dev\"/\"version\": \"${GITHUB_SHA::7}\"/" _site/manifest.json
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

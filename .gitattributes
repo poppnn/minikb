@@ -1,0 +1,4 @@
+* text=auto
+*.stl binary
+*.f3d binary
+*.png binary

@@ -1,0 +1,11 @@
+.pio/
+.vscode/
+__pycache__/
+test/webui/node_modules/
+test/webui/test-results/
+test/webui/playwright-report/
+# Images fusionnées : produites par tools/merge_bin.py et par le CI
+webflasher/firmware/
+# STL bruts de Fusion : régénérés par enclosure/fusion_export.py
+enclosure/stl/raw/
+enclosure/variants/*/stl/raw/

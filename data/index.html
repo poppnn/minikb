@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MiniKB – Configuration</title>
+<style>
+  :root {
+    --bg: #0b1220; --panel: #111a2e; --field: #0d1527; --border: #22325a;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #22d3ee; --accent-2: #3b82f6;
+    --danger: #f87171; --ok: #34d399; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 16px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #0f1a33, var(--bg)); }
+  h1 { margin: 0; font-size: 1.25rem; color: var(--accent); letter-spacing: .02em; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: .9rem; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  h2 { margin: 0 0 12px; font-size: 1.05rem; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  #counter { color: var(--muted); font-weight: 400; font-size: .9rem; font-variant-numeric: tabular-nums; }
+  label { display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
+  input, select { width: 100%; min-height: 44px; padding: 8px 10px; background: var(--field); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+  input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  input[type=checkbox] { width: 22px; min-height: 22px; accent-color: var(--accent); }
+  .check { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: .9rem; }
+  .key { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  .key.invalid { border-color: var(--danger); }
+  .key .num { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; color: var(--accent); font-weight: 600; }
+  .key .send { grid-column: 1 / -1; }
+  .key .tools { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+  .key .tools .group { display: flex; gap: 6px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  .grid .wide { grid-column: 1 / -1; }
+  button { min-height: 44px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: #16223d; color: var(--text); font: inherit; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #04202a; font-weight: 600; }
+  button.danger { color: var(--danger); }
+  button.icon { min-width: 44px; padding: 8px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .actions .primary { flex: 1 1 100%; }
+  #status { min-height: 1.4em; margin: 0; font-size: .9rem; }
+  #status.error { color: var(--danger); }
+  #status.ok { color: var(--ok); }
+  #errors { color: var(--danger); margin: 8px 0 0; padding-left: 20px; font-size: .9rem; }
+  #errors:empty { display: none; }
+  .hint { color: var(--muted); font-size: .8rem; margin: 6px 0 0; }
+  @media (min-width: 640px) {
+    .key { grid-template-columns: 110px 1fr 2fr; }
+    .key .send { grid-column: auto; }
+    .actions .primary { flex: 0 0 auto; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>MiniKB</h1>
+  <p>Mode configuration · le BLE est coupé tant que cette page est utilisée</p>
+</header>
+<main>
+  <section aria-labelledby="keys-title">
+    <h2 id="keys-title">Touches <span id="counter">0 touches / 10 max</span></h2>
+    <div id="keys"></div>
+    <button id="add" type="button">+ Ajouter une touche</button>
+    <ul id="errors" aria-live="polite"></ul>
+  </section>
+
+  <section aria-labelledby="settings-title">
+    <h2 id="settings-title">Réglages</h2>
+    <div class="grid">
+      <label>Layout clavier
+        <select id="layout"><option value="fr">Français (AZERTY)</option><option value="us">US (QWERTY)</option></select>
+      </label>
+      <label>Nom BLE <input id="ble_name" maxlength="29" autocomplete="off"></label>
+      <label class="wide">Mot de passe Wi-Fi config (vide = réseau ouvert, sinon 8 à 63 car.) <input id="ap_pass" maxlength="63" autocomplete="off" placeholder="aucun : réseau ouvert"></label>
+      <label>Délai entre touches (ms) <input id="key_delay_ms" type="number" min="1" max="200" inputmode="numeric"></label>
+      <label>Anti-rebond (ms) <input id="debounce_ms" type="number" min="5" max="200" inputmode="numeric"></label>
+      <label class="wide">Veille après (min, 0 = jamais) <input id="sleep_min" type="number" min="0" max="1440" inputmode="numeric"></label>
+    </div>
+    <p class="hint" id="wake-hint"></p>
+  </section>
+
+  <section aria-labelledby="actions-title">
+    <h2 id="actions-title">Actions</h2>
+    <div class="actions">
+      <button id="save" class="primary" type="button">Enregistrer et redémarrer</button>
+      <button id="export-espanso" type="button">Exporter espanso</button>
+      <button id="export-json" type="button">Exporter JSON</button>
+      <button id="import-json" type="button">Importer JSON</button>
+      <button id="reset" class="danger" type="button">Réinitialiser</button>
+      <input id="import-file" type="file" accept="application/json,.json" hidden>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+  </section>
+</main>
+
+<script>
+"use strict";
+const FALLBACK_PINS = { allowed: [0, 1, 3, 4, 5, 6, 7, 10, 20, 21], wake: [0, 1, 3, 4, 5], max_keys: 10 };
+const $ = (id) => document.getElementById(id);
+let pins = FALLBACK_PINS;
+let cfg = null;
+
+function status(msg, kind) {
+  const el = $("status");
+  el.textContent = msg;
+  el.className = kind || "";
+}
+
+async function api(path, body) {
+  const opts = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function defaultConfig(apPass) {
+  const n = Math.min(8, pins.allowed.length);
+  return {
+    layout: "fr", ble_name: "MiniKB", ap_pass: apPass, key_delay_ms: 8, debounce_ms: 30, sleep_min: 0,
+    keys: pins.allowed.slice(0, n).map((pin, i) => ({ pin, label: String(i + 1), send: `;k${i + 1}`, enter: false })),
+  };
+}
+
+// Même règles que configFromJson() côté firmware.
+function validate(c) {
+  const errs = [];
+  const max = pins.max_keys;
+  if (!Array.isArray(c.keys) || c.keys.length < 1 || c.keys.length > max) errs.push(`Il faut entre 1 et ${max} touches.`);
+  const seen = new Set();
+  (c.keys || []).forEach((k, i) => {
+    const n = `Touche ${i + 1}`;
+    if (!pins.allowed.includes(k.pin)) errs.push(`${n} : GPIO${k.pin} n'est pas autorisé.`);
+    else if (seen.has(k.pin)) errs.push(`${n} : GPIO${k.pin} déjà utilisé.`);
+    seen.add(k.pin);
+    if ((k.label || "").length > 16) errs.push(`${n} : label limité à 16 caractères.`);
+    if ((k.send || "").length > 256) errs.push(`${n} : texte limité à 256 caractères.`);
+    if (!k.send && !k.enter) errs.push(`${n} : rien à envoyer.`);
+  });
+  if (!/^[\x20-\x7e]{1,29}$/.test(c.ble_name || "")) errs.push("Nom BLE : 1 à 29 caractères ASCII.");
+  const pass = c.ap_pass || "";
+  if (pass && (pass.length < 8 || pass.length > 63)) errs.push("Mot de passe Wi-Fi : vide (réseau ouvert) ou 8 à 63 caractères.");
+  const range = (v, lo, hi, name) => { if (!Number.isInteger(v) || v < lo || v > hi) errs.push(`${name} : entier entre ${lo} et ${hi}.`); };
+  range(c.key_delay_ms, 1, 200, "Délai entre touches");
+  range(c.debounce_ms, 5, 200, "Anti-rebond");
+  range(c.sleep_min, 0, 1440, "Veille");
+  if (!["fr", "us"].includes(c.layout)) errs.push("Layout : fr ou us.");
+  return errs;
+}
+
+function readSettings() {
+  for (const id of ["layout", "ble_name", "ap_pass"]) cfg[id] = $(id).value;
+  for (const id of ["key_delay_ms", "debounce_ms", "sleep_min"]) cfg[id] = Number($(id).value);
+}
+
+function writeSettings() {
+  for (const id of ["layout", "ble_name", "ap_pass", "key_delay_ms", "debounce_ms", "sleep_min"]) $(id).value = cfg[id];
+}
+
+function el(tag, props = {}, children = []) {
+  const e = Object.assign(document.createElement(tag), props);
+  for (const c of children) e.append(c);
+  return e;
+}
+
+function renderKeys() {
+  const box = $("keys");
+  box.replaceChildren();
+  const used = cfg.keys.map((k) => k.pin);
+  cfg.keys.forEach((k, i) => {
+    const select = el("select", { ariaLabel: `Pin de la touche ${i + 1}` });
+    const options = pins.allowed.filter((p) => p === k.pin || !used.includes(p));
+    if (!pins.allowed.includes(k.pin)) options.unshift(k.pin);  // pin importé invalide : visible pour correction
+    for (const p of options) {
+      const label = `GPIO${p}` + (pins.allowed.includes(p) ? (pins.wake.includes(p) ? " · réveil" : "") : " · interdit");
+      select.append(el("option", { value: p, textContent: label, selected: p === k.pin }));
+    }
+    select.addEventListener("change", () => { k.pin = Number(select.value); refresh(); });
+
+    const label = el("input", { value: k.label, maxLength: 16, placeholder: "Mail", autocomplete: "off" });
+    label.addEventListener("input", () => { k.label = label.value; refreshErrors(); });
+    const send = el("input", { value: k.send, maxLength: 256, placeholder: ";mail", autocomplete: "off" });
+    send.addEventListener("input", () => { k.send = send.value; refreshErrors(); });
+    const enter = el("input", { type: "checkbox", checked: k.enter });
+    enter.addEventListener("change", () => { k.enter = enter.checked; refreshErrors(); });
+
+    const move = (d) => { const j = i + d; [cfg.keys[i], cfg.keys[j]] = [cfg.keys[j], cfg.keys[i]]; refresh(); };
+    const up = el("button", { type: "button", className: "icon", textContent: "↑", disabled: i === 0, ariaLabel: "Monter" });
+    up.addEventListener("click", () => move(-1));
+    const down = el("button", { type: "button", className: "icon", textContent: "↓", disabled: i === cfg.keys.length - 1, ariaLabel: "Descendre" });
+    down.addEventListener("click", () => move(1));
+    const test = el("button", { type: "button", textContent: "Tester" });
+    test.addEventListener("click", () => testKey(k));
+    const del = el("button", { type: "button", className: "icon danger", textContent: "✕", disabled: cfg.keys.length <= 1, ariaLabel: `Supprimer la touche ${i + 1}` });
+    del.addEventListener("click", () => { cfg.keys.splice(i, 1); refresh(); });
+
+    box.append(el("div", { className: "key" + (pins.allowed.includes(k.pin) ? "" : " invalid") }, [
+      el("div", { className: "num", textContent: `Touche ${i + 1}` }),
+      el("label", { textContent: "Pin" }, [select]),
+      el("label", { textContent: "Label" }, [label]),
+      el("label", { className: "send", textContent: "Texte envoyé" }, [send]),
+      el("div", { className: "tools" }, [
+        el("label", { className: "check" }, [enter, "Entrée à la fin"]),
+        el("div", { className: "group" }, [up, down, test, del]),
+      ]),
+    ]));
+  });
+}
+
+function refreshErrors() {
+  readSettings();
+  const errs = validate(cfg);
+  $("errors").replaceChildren(...errs.map((e) => el("li", { textContent: e })));
+  return errs;
+}
+
+function refresh() {
+  renderKeys();
+  const n = cfg.keys.length;
+  $("counter").textContent = `${n} touche${n > 1 ? "s" : ""} / ${pins.max_keys} max`;
+  const free = pins.allowed.filter((p) => !cfg.keys.some((k) => k.pin === p));
+  $("add").disabled = n >= pins.max_keys || free.length === 0;
+  $("wake-hint").textContent = `Réveil de veille possible uniquement par les touches sur GPIO ${pins.wake.join(", ")}.`;
+  refreshErrors();
+}
+
+async function testKey(k) {
+  try {
+    const r = await api("/api/test", { text: k.send, enter: k.enter });
+    if (r.unsupported && r.unsupported.length) status(`Caractères non supportés en ${cfg.layout} : ${r.unsupported.join(" ")}`, "error");
+    else status(`Conversion OK : ${r.strokes} frappe(s).` + (r.ble ? "" : " (BLE coupé en mode config : rien n'est envoyé.)"), "ok");
+  } catch (e) { status(`Test impossible : ${e.message}`, "error"); }
+}
+
+function espansoYaml(c) {
+  const q = (s) => JSON.stringify(s);  // une chaîne JSON est un scalaire YAML double-quoté valide
+  const lines = [
+    "# MiniKB -> espanso : copier dans ~/.config/espanso/match/minikb.yml",
+    "# Remplacez chaque « replace » par le texte que la touche doit produire.",
+    "matches:",
+  ];
+  for (const k of c.keys) {
+    if (!k.send) continue;
+    lines.push(`  - trigger: ${q(k.send)}`, `    replace: ${q(k.label || k.send)}`);
+  }
+  return lines.join("\n") + "\n";
+}
+
+function download(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = el("a", { href: url, download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+$("add").addEventListener("click", () => {
+  const free = pins.allowed.find((p) => !cfg.keys.some((k) => k.pin === p));
+  if (free === undefined || cfg.keys.length >= pins.max_keys) return;
+  const n = cfg.keys.length + 1;
+  cfg.keys.push({ pin: free, label: String(n), send: `;k${n}`, enter: false });
+  refresh();
+});
+
+for (const id of ["layout", "ble_name", "ap_pass", "key_delay_ms", "debounce_ms", "sleep_min"]) $(id).addEventListener("input", refreshErrors);
+
+$("save").addEventListener("click", async () => {
+  if (refreshErrors().length) return status("Corrigez les erreurs avant d'enregistrer.", "error");
+  try {
+    await api("/api/config", cfg);
+    status("Enregistré. Le clavier redémarre en mode normal (BLE).", "ok");
+  } catch (e) { status(`Refusé par le clavier : ${e.message}`, "error"); }
+});
+
+$("export-espanso").addEventListener("click", () => { readSettings(); download("minikb.yml", espansoYaml(cfg), "text/yaml"); });
+$("export-json").addEventListener("click", () => { readSettings(); download("minikb-config.json", JSON.stringify(cfg, null, 2), "application/json"); });
+$("import-json").addEventListener("click", () => $("import-file").click());
+$("import-file").addEventListener("change", async (ev) => {
+  const file = ev.target.files[0];
+  ev.target.value = "";
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (typeof data !== "object" || !Array.isArray(data.keys)) throw new Error("champ keys absent");
+    cfg = Object.assign(defaultConfig(cfg.ap_pass), data);
+    writeSettings();
+    refresh();
+    status("Config importée : vérifiez puis enregistrez.", "ok");
+  } catch (e) { status(`Import impossible : ${e.message}`, "error"); }
+});
+$("reset").addEventListener("click", () => {
+  if (!confirm("Revenir à la configuration par défaut ? (non enregistré tant que vous ne cliquez pas sur Enregistrer)")) return;
+  cfg = defaultConfig(cfg.ap_pass);
+  writeSettings();
+  refresh();
+  status("Valeurs par défaut chargées, non enregistrées.", "");
+});
+
+(async () => {
+  try { pins = await api("/api/pins"); } catch { status("Liste des pins indisponible, valeurs SuperMini utilisées.", "error"); }
+  try { cfg = await api("/api/config"); }
+  catch (e) { cfg = defaultConfig(""); status(`Lecture de la config impossible : ${e.message}`, "error"); }
+  writeSettings();
+  refresh();
+})();
+</script>
+</body>
+</html>

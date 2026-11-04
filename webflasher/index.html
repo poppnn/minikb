@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MiniKB Flasher</title>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.1.0/dist/web/install-button.js?module"></script>
+<style>
+  :root { --bg: #0b1220; --panel: #111a2e; --border: #22325a; --text: #e2e8f0; --muted: #94a3b8; --accent: #22d3ee; --warn: #fbbf24; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; display: grid; gap: 16px; }
+  h1 { margin: 0; color: var(--accent); font-size: 1.6rem; }
+  h2 { margin: 0 0 8px; font-size: 1.05rem; }
+  p { margin: 0; }
+  .lead { color: var(--muted); }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  ol, ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+  code { background: #0d1527; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: .9em; }
+  .install { display: grid; gap: 12px; justify-items: start; }
+  esp-web-install-button button[slot=activate] { min-height: 48px; padding: 10px 22px; border: 0; border-radius: 8px; background: var(--accent); color: #04202a; font: 600 1rem system-ui, sans-serif; cursor: pointer; }
+  .warn { color: var(--warn); }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>MiniKB Flasher</h1>
+    <p class="lead">Installe le firmware du clavier de macros BLE depuis le navigateur, sans rien installer.</p>
+  </header>
+
+  <section class="install" aria-labelledby="install-title">
+    <h2 id="install-title">Installer</h2>
+    <p>Branche l'ESP32-C3 SuperMini (ou un ESP32-S3) en USB, puis :</p>
+    <esp-web-install-button manifest="manifest.json">
+      <button slot="activate">Connecter et flasher</button>
+      <span slot="unsupported" class="warn">Navigateur non compatible : utilise Chrome ou Edge sur ordinateur (Web Serial).</span>
+      <span slot="not-allowed" class="warn">Le flash demande une page en HTTPS.</span>
+    </esp-web-install-button>
+    <p class="lead">Coche « Effacer l'appareil » pour une première installation : la config repart des valeurs par défaut.</p>
+  </section>
+
+  <section aria-labelledby="after-title">
+    <h2 id="after-title">Après le flash</h2>
+    <ol>
+      <li><strong>Appuie sur RST</strong> de la carte. Sur la SuperMini, le reset par USB laisse la puce en mode téléchargement.</li>
+      <li>La LED clignote : appaire <strong>MiniKB</strong> dans les réglages Bluetooth de l'ordinateur. Elle reste fixe une fois connectée.</li>
+      <li>Pour configurer : maintiens <strong>BOOT 3 s</strong>, connecte-toi au Wi-Fi <code>MiniKB-Config</code> (ouvert par défaut) et ouvre <code>http://192.168.4.1</code>. Tu peux y définir un mot de passe Wi-Fi.</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="info-title">
+    <h2 id="info-title">Bon à savoir</h2>
+    <ul>
+      <li>Le layout de l'ordinateur doit correspondre au réglage du clavier (AZERTY <code>fr</code> par défaut).</li>
+      <li>L'état du clavier s'affiche si tu envoies un caractère sur son port série (115200 bauds).</li>
+      <li>Sources, boîtier imprimable et documentation : <a href="https://github.com/poppnn/minikb">github.com/poppnn/minikb</a>.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>
