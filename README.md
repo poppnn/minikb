@@ -111,6 +111,8 @@ Le plus fiable : chaque touche envoie un trigger court en ASCII (par ex. `;mail`
 
 `sleep_min` > 0 active un deep sleep après ce nombre de minutes sans appui. Le réveil se fait par une touche sur GPIO 0, 1, 3, 4 ou 5. Cet appui ne fait que réveiller : il n'est pas tapé. Si aucune touche n'est sur ces pins, la veille est annulée (message sur le port série).
 
+En fonctionnement, le CPU tourne à 80 MHz et se met en attente entre deux tours de boucle. Le clavier demande aussi à l'hôte une latence BLE de 30 : la radio saute les échanges vides, sans retarder les appuis. Le vrai light sleep n'est pas possible avec le core Arduino 2.x précompilé (`CONFIG_PM_ENABLE` absent). Il faudrait recompiler le SDK. Sur batterie, active donc `sleep_min` (par exemple 10).
+
 ## ESP32-S3
 
 `pio run -e esp32s3` compile la même base. Les rapports clavier partent en BLE **et** en USB HID natif (TinyUSB). Retire `-DMINIKB_USB_HID` dans `platformio.ini` pour n'avoir que le BLE. Les pins autorisés y sont différents (voir `src/config.h`). En deep sleep, seule la première touche sur un pin RTC réveille le S3 (limite d'ESP-IDF 4.4).

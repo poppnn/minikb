@@ -61,6 +61,8 @@ static void handleSerial() {
 }
 
 void setup() {
+    // 80 MHz suffit au BLE et au Wi-Fi, et consomme moins que les 160 MHz par défaut.
+    setCpuFrequencyMhz(80);
     Serial.begin(115200);
     // L'USB CDC se réénumère au reset : laisse 2 s au terminal pour se reconnecter, sinon les logs (et le mot de passe AP) sont perdus.
     while (!Serial && millis() < 2000) {}
@@ -93,6 +95,7 @@ void loop() {
     if (Serial.available()) handleSerial();
     if (configMode) {
         webLoop(now);
+        delay(1);
         return;
     }
 
@@ -109,4 +112,6 @@ void loop() {
     }
     hidLoop(now, cfg.keyDelayMs);
     powerLoop(cfg, now, hidBusy());
+    // Rend la main à la tâche idle, qui met le CPU en attente d'interruption au lieu de tourner à vide.
+    delay(1);
 }

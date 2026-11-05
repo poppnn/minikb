@@ -31,8 +31,11 @@ static bool keyDown = false;
 static uint32_t lastStepAt = 0;
 
 class ServerCallbacks : public NimBLEServerCallbacks {
-    void onConnect(NimBLEServer*) override {
+    void onConnect(NimBLEServer* server, ble_gap_conn_desc* desc) override {
         connected = true;
+        // Intervalle 15-30 ms, latence 30 : la radio saute les échanges vides, mais un appui part au suivant.
+        // Timeout 4 s (unités de 10 ms). L'hôte peut refuser, ça reste fonctionnel.
+        server->updateConnParams(desc->conn_handle, 12, 24, 30, 400);
         Serial.println("[ble] connecté");
     }
     void onDisconnect(NimBLEServer*) override {
