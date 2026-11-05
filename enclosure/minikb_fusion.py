@@ -64,6 +64,9 @@ PARAMS = [
     ("battery", "0", "", "1 = petite LiPo + TP4056 USB-C (relancer le script après changement)"),
     ("front_tp", "0", "", "1 = TP4056 sous les touches avant, USB-C en façade (relancer le script)"),
     ("ftp_sw_y", "inner_l / 2", "mm", "Axe de l'interrupteur dans la paroi gauche (option front_tp)"),
+    ("sw_body_l", "8.6 mm", "mm", "Longueur du corps de l'interrupteur SS12D00, à vérifier"),
+    ("sw_body_d", "3.6 mm", "mm", "Épaisseur du corps, face levier -> pattes, à vérifier"),
+    ("sw_body_h", "3.5 mm", "mm", "Hauteur du corps, à vérifier"),
     ("tp_l", "28 mm", "mm", "Longueur TP4056 USB-C avec protection, à vérifier"),
     ("tp_w", "17.5 mm", "mm", "Largeur TP4056, à vérifier"),
     ("tp_pcb_t", "1 mm", "mm", "Épaisseur PCB TP4056, à vérifier"),
@@ -466,6 +469,26 @@ def build_case(comp):
     sk = Sk(comp, p, "FTP_switch")
     sk.rect("wall + 1 mm", "ftp_sw_y - sw_hole_w / 2", "wall + 2 mm", "sw_hole_w", sx=-1)
     extrude(comp, sk.all_profiles(), "sw_hole_h", CUT, "FTP_switch_cut", body)
+    # Cadre : le corps se clipse par le dessus contre la paroi, posé sur une cale ; la butée arrière
+    # est ouverte au milieu pour les pattes. Ajustement serré (tolerance / 2 au total).
+    D, L = "(sw_body_d + tolerance / 2)", "(sw_body_l + tolerance / 2)"
+    sk = Sk(comp, p_floor, "FTP_switch_frame")
+    boxes = [sk.rect("1 mm", f"ftp_sw_y - {L} / 2 - cradle_wall", f"1 mm + {D} + cradle_wall", f"{L} + 2 * cradle_wall", sx=-1),
+             sk.rect("0.5 mm", f"ftp_sw_y - {L} / 2", f"0.5 mm + {D}", L, sx=-1),
+             sk.rect(f"{D} - 0.5 mm", f"ftp_sw_y - {L} / 2 + 1.5 mm", "cradle_wall + 1.5 mm", f"{L} - 3 mm")]
+
+    def inside(prof, lines):  # boîte du profil contenue dans le rectangle (le cadre en C contient sa poche)
+        bb, e = prof.boundingBox, 1e-6
+        xs = [l.startSketchPoint.geometry.x for l in lines]
+        ys = [l.startSketchPoint.geometry.y for l in lines]
+        return (min(xs) - e <= bb.minPoint.x and bb.maxPoint.x <= max(xs) + e
+                and min(ys) - e <= bb.minPoint.y and bb.maxPoint.y <= max(ys) + e)
+
+    outer, pocket, pins = boxes
+    profs = sk.all_profiles()
+    frame = [p for p in profs if inside(p, outer) and not inside(p, pocket) and not inside(p, pins)]
+    extrude(comp, frame, "sw_hole_z + sw_body_h / 2", JOIN, "FTP_switch_frame", body)
+    extrude(comp, [p for p in profs if inside(p, pocket)], "sw_hole_z - sw_body_h / 2", JOIN, "FTP_switch_seat", body)
 
     chamfer(comp, outer_loop_edges(planar_face_at_z(body, 0, -1)), "ef_chamfer", "Elephant_foot")
     return body

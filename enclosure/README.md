@@ -37,7 +37,8 @@ Les variantes batterie sont dans `variants/<n>_touches_batterie/`.
 - TP4056 USB-C 26 × 17 mm (`tp_l`, `tp_w`) sous les touches avant, prise dans la façade, ESP32-C3 à l'arrière (`front_tp` = 1) ; 4 mm de jeu entre le haut de sa prise et les pattes des switches pour les fils.
 
 - berceau de la SuperMini rallongé de 1 mm (`board_l` = 23,5) : la carte ne rentrait pas à 22,5 ;
-- trou d'interrupteur à glissière (SS12D00, 9 × 4,5 mm) dans la paroi gauche, à mi-longueur (`ftp_sw_y`), entre le TP4056 et la SuperMini : à coller par l'intérieur ;
+- interrupteur à glissière SS12D00 dans la paroi gauche, à mi-longueur (`ftp_sw_y`) : seul le levier sort par une fente de 5 × 2,2 mm (`sw_hole_w`, `sw_hole_h`). Le corps (8,6 × 3,6 × 3,5 mm : `sw_body_l`, `sw_body_d`, `sw_body_h`, **à vérifier sur le tien**) se clipse par le dessus dans un cadre serré contre la paroi, posé sur une cale. Le cadre est ouvert au milieu pour les pattes ;
+- trou BOOT du capot dans l'axe de l'USB-C, 2 mm derrière la prise (`boot_x`, `boot_y`) ;
 - prises USB-C à fleur de la face (`usb_flush` = 1) : le bord de chaque carte entre dans une poche de la paroi, et il ne reste devant qu'une peau de 0,8 mm percée juste à la forme de la prise (oblong, 0,2 mm de jeu). Cette peau empêche aussi la carte de ressortir. **Mesure de combien la prise dépasse du PCB sur tes cartes** et reporte-le dans `usb_overhang` (SuperMini) et `tp_usb_overhang` (TP4056), 0,8 mm par défaut : c'est l'épaisseur de la peau. Pour poser une carte, engage d'abord la prise dans son trou, carte légèrement inclinée, puis rabats l'autre bout dans le berceau.
 
 Enfonce les inserts à fleur du haut des piliers : le trou continue en dessous, ne pousse pas plus loin. La LED de charge du TP4056 n'est pas visible (sous les touches). Les autres variantes et les valeurs par défaut du script restent en M2 + inserts, sans `front_tp`.
